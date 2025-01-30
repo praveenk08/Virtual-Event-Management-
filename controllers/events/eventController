@@ -1,0 +1,118 @@
+const eventModel = require('../../models/eventModel');
+const sendEmail= require('../../helper/emailHelper');
+// const redisClient = require('../../config/redis');
+
+const handleErrorResponse = (res, status, message) => res.status(status).json({ message });
+
+
+const events =  async (req, res) => {
+  try {
+    const events = await eventModel.find();
+    if (!events) {
+      return handleErrorResponse(res, 404, 'No events found!');
+    }
+    res.json({events, message: 'Events Lists!'});
+  } catch (err) {
+    handleErrorResponse(res, 500, err.message);
+  }
+}
+
+const getEvent = async (req, res) => {
+  try {
+    const event = await eventModel.findById(req.params.id);
+    if (!event) {
+      return handleErrorResponse(res, 404, 'Event not found!');
+    }
+    res.json({event, message: 'Event found!'});
+  } catch (err) {
+    handleErrorResponse(res, 500, err.message);
+  }
+}
+
+const addEvent = async (req, res) => {
+  const { date, title, description } = req.body;
+
+  if (!date || !title || !description) {
+    return handleErrorResponse(res, 400, 'Title Date, and description are required');
+  }
+
+  try {
+      const events = await eventModel.create({
+        title: req.body.title,
+        date: req.body.date,
+        location: req.body.location,
+        description: req.body.description
+      });
+
+      if (!events) {
+        return handleErrorResponse(res, 400, 'Event not created!');
+      }  
+
+      const to = 'praveenairtribe@gmail.com';
+      const text = 'Event created successfully!';
+      const subject = events.title;
+      const date = events.date;
+      const location = events.location;
+      const description = events.description;
+      const html = `<h1>Title : ${subject}</h1><p>Date On : ${date}</p><p>Venue : ${location}</p><p>Description : ${description}</p>`;
+
+      const result = await sendEmail({ to, subject, text, html });
+      console.log('Result send mail',result);
+      if (!result) {
+        return handleErrorResponse(res, 400, 'Email not sent!');
+      }
+      return res.status(201).json({ success: 'Event added successfully !' });
+  } catch (error) {
+    console.log(error);
+    handleErrorResponse(res, 500, 'Something went wrong!');
+  }
+
+};
+
+const updateEvent = async (req, res) => {
+
+  console.log('req.body user id ',req.user.id);
+  console.log('req.params.id',req.params.id);
+
+
+  if (!req.body.title || !req.body.date || !req.body.description) {
+    return handleErrorResponse(res, 400, 'Title, Date, and description are required');
+  }
+
+
+  try {
+    const event = await eventModel.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!event) {
+      return handleErrorResponse(res, 404, 'Event not found!');
+    }
+    res.json({event, message: 'Event updated successfully!'});
+  } catch (err) {
+    handleErrorResponse(res, 500, err.message);
+  }
+}
+
+const deleteEvent = async (req, res) => {
+  try {
+    console.log('req.params.id',req.params.id);
+    const event = await eventModel.findByIdAndDelete(req.params.id);  
+    if (!event) {
+      return handleErrorResponse(res, 404, 'Event not found!');
+    }
+    res.json({ success: 'Event deleted successfully!' });
+  } catch (err) {
+    handleErrorResponse(res, 500, err.message);
+  }
+}
+
+
+
+module.exports = {
+  events,
+  addEvent,
+  getEvent,
+  updateEvent,
+  deleteEvent
+};
